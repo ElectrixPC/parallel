@@ -65,14 +65,14 @@ int main(int argc, char **argv) {
 			throw err;
 		}
 		timer.Start();
-		std::ifstream input_file("temp_lincolnshire_short.txt", std::ios::in | std::ios::binary | std::ios::ate);
+		std::ifstream input_file("temp_lincolnshire.txt", std::ios::in | std::ios::binary | std::ios::ate);
 
 		//Get Size of File
 		std::size_t size = input_file.tellg();
 
 		std::size_t sizeBytes = size * sizeof(char);//size in bytes
 		std::size_t sizeFLTBytes = size * sizeof(float);
-												   
+		std::size_t sizeIDXBytes = size * sizeof(int);
 		input_file.seekg(0, std::ios_base::beg);//Seek back to the start of the file
 
 		//Read into char buffer with size of file
@@ -83,26 +83,27 @@ int main(int argc, char **argv) {
 		input_file.close();
 
 		vector<float> temps(size);
-		//vector<int> checked(size);
+		vector<double> metrics(3);
+		vector<int> lines(size);
 
-		//// define size of buffers for OpenCL
-		//cl::Buffer buffer_valCheck(context, CL_MEM_READ_WRITE, sizeBytes);
-		//cl::Buffer buffer_outCheck(context, CL_MEM_READ_WRITE, sizeIDXBytes);
-		////Copy array to device memory
-		//cl::Event valCheck_event;
-		//queue.enqueueWriteBuffer(buffer_valCheck, CL_TRUE, 0, sizeBytes, &inputElements[0], NULL, &valCheck_event);
+		// define size of buffers for OpenCL
+		cl::Buffer buffer_valCheck(context, CL_MEM_READ_WRITE, sizeBytes);
+		cl::Buffer buffer_outCheck(context, CL_MEM_READ_WRITE, sizeIDXBytes);
+		//Copy array to device memory
+		cl::Event valCheck_event;
+		queue.enqueueWriteBuffer(buffer_valCheck, CL_TRUE, 0, sizeBytes, &inputElements[0], NULL, &valCheck_event);
 
 
-		//// Create kernel instance
-		//cl::Kernel kernel_groupdata = cl::Kernel(program, "groupdata");
-		//// Set arguments for kernel (in and out)
-		//kernel_groupdata.setArg(0, buffer_valCheck);
-		//kernel_groupdata.setArg(1, buffer_outCheck);
-		//// Run kernel
-		//cl::Event prof_groupdata;
-		//queue.enqueueNDRangeKernel(kernel_groupdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_groupdata);
-		//// Retrieve output from OpenCL
-		//queue.enqueueReadBuffer(buffer_outCheck, CL_TRUE, 0, size, &checked[0]);
+		// Create kernel instance
+		cl::Kernel kernel_groupdata = cl::Kernel(program, "groupdata");
+		// Set arguments for kernel (in and out)
+		kernel_groupdata.setArg(0, buffer_valCheck);
+		kernel_groupdata.setArg(1, buffer_outCheck);
+		// Run kernel
+		cl::Event prof_groupdata;
+		queue.enqueueNDRangeKernel(kernel_groupdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_groupdata);
+		// Retrieve output from OpenCL
+		queue.enqueueReadBuffer(buffer_outCheck, CL_TRUE, 0, size, &lines[0]);
 
 		//vector<int> checkedidx(size);
 
@@ -122,10 +123,12 @@ int main(int argc, char **argv) {
 		//queue.enqueueReadBuffer(buffer_outIDX, CL_TRUE, 0, size, &checkedidx[0]);
 
 
+		float stepsize = (float)sizeBytes / (float)lines[0];
 
 		// define size of buffers for OpenCL
 		cl::Buffer buffer_val(context, CL_MEM_READ_WRITE, sizeBytes);
 		cl::Buffer buffer_out(context, CL_MEM_READ_WRITE, sizeFLTBytes);
+		cl::Buffer buffer_metrics(context, CL_MEM_READ_WRITE, 3*sizeof(double));
 		//Copy array to device memory
 		cl::Event val_event;
 		cl::Event idx_event;
@@ -133,15 +136,16 @@ int main(int argc, char **argv) {
 		// Create kernel instance
 		cl::Kernel kernel_splitdata = cl::Kernel(program, "splitdata");
 		// Set arguments for kernel (in and out)
-		kernel_splitdata.setArg(0, buffer_val);
-		//kernel_splitdata.setArg(1, buffer_outIDX);
-		kernel_splitdata.setArg(1, buffer_out);
+		kernel_splitdata.setArg(0, stepsize);
+		kernel_splitdata.setArg(1, buffer_val);
+		kernel_splitdata.setArg(2, buffer_out);
+		kernel_splitdata.setArg(3, buffer_metrics);
 		// Run kernel
 		cl::Event prof_splitdata;
 		queue.enqueueNDRangeKernel(kernel_splitdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_splitdata);
 		// Retrieve output from OpenCL
 		queue.enqueueReadBuffer(buffer_out, CL_TRUE, 0, size, &temps[0]);
-
+		queue.enqueueReadBuffer(buffer_metrics, CL_TRUE, 0, 3, &metrics[0]);
 		long timetaken;
 		timetaken = (prof_splitdata.getProfilingInfo<CL_PROFILING_COMMAND_END>() - prof_splitdata.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Kernel execution time
 		timetaken += (val_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - val_event.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Memory transfer time
