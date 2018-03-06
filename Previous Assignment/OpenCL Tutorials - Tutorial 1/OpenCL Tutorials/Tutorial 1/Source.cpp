@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
 		std::size_t size = input_file.tellg();
 
 		std::size_t sizeBytes = size * sizeof(char);//size in bytes
-		std::size_t sizeIDXBytes = size * sizeof(int);
+		std::size_t sizeFLTBytes = size * sizeof(float);
 												   
 		input_file.seekg(0, std::ios_base::beg);//Seek back to the start of the file
 
@@ -83,68 +83,49 @@ int main(int argc, char **argv) {
 		input_file.close();
 
 		vector<float> temps(size);
-		vector<int> checked(size);
+		//vector<int> checked(size);
 
-		// define size of buffers for OpenCL
-		cl::Buffer buffer_valCheck(context, CL_MEM_READ_WRITE, sizeBytes);
-		cl::Buffer buffer_outCheck(context, CL_MEM_READ_WRITE, sizeIDXBytes);
-		//Copy array to device memory
-		cl::Event valCheck_event;
-		queue.enqueueWriteBuffer(buffer_valCheck, CL_TRUE, 0, sizeBytes, &inputElements[0], NULL, &valCheck_event);
+		//// define size of buffers for OpenCL
+		//cl::Buffer buffer_valCheck(context, CL_MEM_READ_WRITE, sizeBytes);
+		//cl::Buffer buffer_outCheck(context, CL_MEM_READ_WRITE, sizeIDXBytes);
+		////Copy array to device memory
+		//cl::Event valCheck_event;
+		//queue.enqueueWriteBuffer(buffer_valCheck, CL_TRUE, 0, sizeBytes, &inputElements[0], NULL, &valCheck_event);
 
 
-		// Create kernel instance
-		cl::Kernel kernel_groupdata = cl::Kernel(program, "groupdata");
-		// Set arguments for kernel (in and out)
-		kernel_groupdata.setArg(0, buffer_valCheck);
-		kernel_groupdata.setArg(1, buffer_outCheck);
-		// Run kernel
-		cl::Event prof_groupdata;
-		queue.enqueueNDRangeKernel(kernel_groupdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_groupdata);
-		// Retrieve output from OpenCL
-		queue.enqueueReadBuffer(buffer_outCheck, CL_TRUE, 0, size, &checked[0]);
+		//// Create kernel instance
+		//cl::Kernel kernel_groupdata = cl::Kernel(program, "groupdata");
+		//// Set arguments for kernel (in and out)
+		//kernel_groupdata.setArg(0, buffer_valCheck);
+		//kernel_groupdata.setArg(1, buffer_outCheck);
+		//// Run kernel
+		//cl::Event prof_groupdata;
+		//queue.enqueueNDRangeKernel(kernel_groupdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_groupdata);
+		//// Retrieve output from OpenCL
+		//queue.enqueueReadBuffer(buffer_outCheck, CL_TRUE, 0, size, &checked[0]);
 
-		vector<int> checkedidx(size);
-		/*for (int i = 0; i < size; i++) {
-			if (checked[i] == 0) {
-				if (i == 0) {
-					continue;
-				}
-				if (checked[i - 1] == 0) {
-					checkedidx[i] = checkedidx[i-1];
-				}
-				if (checked[i - 1] == 1) {
-					checkedidx[i] = checkedidx[i - 1] + 1;
-				}
+		//vector<int> checkedidx(size);
 
-			}
-			if (checked[i] == 1) {
-				checkedidx[i] = checkedidx[i - 1] + 1;
-			}
-		}*/
-
-		
-
-		// define size of buffers for OpenCL
-		cl::Buffer buffer_outIDX(context, CL_MEM_READ_WRITE, sizeIDXBytes);
-		//Copy array to device memory
-		cl::Event valIDX_event;
-		// Create kernel instance
-		cl::Kernel kernel_genidx = cl::Kernel(program, "scan_add_atomic");
-		// Set arguments for kernel (in and out)
-		kernel_genidx.setArg(0, buffer_outCheck);
-		kernel_genidx.setArg(1, buffer_outIDX);
-		// Run kernel
-		cl::Event prof_genidx;
-		queue.enqueueNDRangeKernel(kernel_genidx, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_genidx);
-		// Retrieve output from OpenCL
-		queue.enqueueReadBuffer(buffer_outIDX, CL_TRUE, 0, size, &checkedidx[0]);
+		//// define size of buffers for OpenCL
+		//cl::Buffer buffer_outIDX(context, CL_MEM_READ_WRITE, sizeIDXBytes);
+		////Copy array to device memory
+		//cl::Event valIDX_event;
+		//// Create kernel instance
+		//cl::Kernel kernel_genidx = cl::Kernel(program, "scan_add_atomic");
+		//// Set arguments for kernel (in and out)
+		//kernel_genidx.setArg(0, buffer_outCheck);
+		//kernel_genidx.setArg(1, buffer_outIDX);
+		//// Run kernel
+		//cl::Event prof_genidx;
+		//queue.enqueueNDRangeKernel(kernel_genidx, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_genidx);
+		//// Retrieve output from OpenCL
+		//queue.enqueueReadBuffer(buffer_outIDX, CL_TRUE, 0, size, &checkedidx[0]);
 
 
 
 		// define size of buffers for OpenCL
 		cl::Buffer buffer_val(context, CL_MEM_READ_WRITE, sizeBytes);
-		cl::Buffer buffer_out(context, CL_MEM_READ_WRITE, sizeBytes);
+		cl::Buffer buffer_out(context, CL_MEM_READ_WRITE, sizeFLTBytes);
 		//Copy array to device memory
 		cl::Event val_event;
 		cl::Event idx_event;
@@ -153,8 +134,8 @@ int main(int argc, char **argv) {
 		cl::Kernel kernel_splitdata = cl::Kernel(program, "splitdata");
 		// Set arguments for kernel (in and out)
 		kernel_splitdata.setArg(0, buffer_val);
-		kernel_splitdata.setArg(1, buffer_outIDX);
-		kernel_splitdata.setArg(2, buffer_out);
+		//kernel_splitdata.setArg(1, buffer_outIDX);
+		kernel_splitdata.setArg(1, buffer_out);
 		// Run kernel
 		cl::Event prof_splitdata;
 		queue.enqueueNDRangeKernel(kernel_splitdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_splitdata);
