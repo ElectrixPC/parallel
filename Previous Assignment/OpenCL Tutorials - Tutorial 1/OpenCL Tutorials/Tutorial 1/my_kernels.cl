@@ -27,8 +27,20 @@ __kernel void groupdata(__global const char* val, __global int* out) {
 	int id = get_global_id(0);
 	if (val[id] == '\n') 
 	{
-		out[id] = 1;
+		atomic_add(&out[0], 1);
+	} 
+}
+
+__kernel void linedata(__global const char* val, __global int* out) {
+	int id = get_global_id(0);
+	if (val[id] == '\n')
+	{
+		out[id] = out[id-1] + 1;
 	}
+	else {
+		out[id] = out[id - 1];
+	}
+	printf("ID: %i SIZE: %i", id, out);
 }
 
 __kernel void scan_add_atomic(__global int* checked, __global int* checkedidx) {
@@ -38,7 +50,7 @@ __kernel void scan_add_atomic(__global int* checked, __global int* checkedidx) {
 		atomic_add(&checkedidx[i], checked[id]);
 }
 
-__kernel void splitdata(__global const char* val, __global float* out) {
+__kernel void splitdata(const float stepsize, __global const char* val,  __global float* out, __global double* metrics) {
 	int id  = get_global_id(0);
 	float temp = 0;
 	float digit;
@@ -53,33 +65,15 @@ __kernel void splitdata(__global const char* val, __global float* out) {
 			}
 		}
 		temp = temp / div;
-		int idx = floor(id / 31.419763);
-		out[idx] = temp;
-		printf("ID: %i TEMP: %f", idx, temp);
-		//printf("ID: %i TEMP: %f -- %c %c %c %c", id, temp, val[id-5], val[id-4], val[id-3], val[id-2]);
-	 }
-}
-
-__kernel void splitandsortdata(__global const char* val, __global float* out, __local float* scratch, int merge) {
-	int id  = get_global_id(0);
-	int lid = get_local_id(0);
-    int gid = get_group_id(0);
-    int N = get_local_size(0);
-	float temp = 0;
-	float digit;
-	float div = 10.0;
-
-	if (val[id] == '\n') 
-	{
-		for (unsigned int i = 5; i > 1; i--) {
-			if(val[id-(i)] != ' ' && val[id-(i)] != '.') 
-			{
-				digit = val[id-(i)] - 48;
-				temp = (temp * 10) + digit;
-			}
+		metrics[2] = metrics[2] + temp;
+		int idx = floor(id / stepsize);
+		out[idx - 1] = temp;
+		if(temp < metrics[0]) { 
+			metrics[0] = temp;
 		}
-		temp = temp / div;
-		//printf("ID: %i TEMP: %f -- %c %c %c %c", id, temp, val[id-5], val[id-4], val[id-3], val[id-2]);
+		if (temp > metrics[1]) {
+			metrics[1] = temp;
+		}
+		//printf("METRICS 0: %f METRICS 1: %f METRICS 2: %f", metrics[0], metrics[1], metrics[2]);
 	 }
-	out[id] = temp;
 }
