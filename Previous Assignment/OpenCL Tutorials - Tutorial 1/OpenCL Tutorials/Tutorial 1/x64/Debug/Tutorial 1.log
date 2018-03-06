@@ -1,0 +1,9 @@
+﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(392,5): warning MSB8028: The intermediate directory (x64\Debug\) contains files shared from another project (Tutorial 1.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+  Source.cpp
+Source.cpp(165): warning C4244: '=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+Source.cpp(166): warning C4244: '+=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+LINK : warning LNK4075: ignoring '/INCREMENTAL' due to '/PROFILE' specification
+  Tutorial 1.vcxproj -> C:\Users\lanca\OneDrive - University of Lincoln\Documents\Parallel\Previous Assignment\OpenCL Tutorials - Tutorial 1\OpenCL Tutorials\x64\Debug\Previous Assignment.exe
+  Tutorial 1.vcxproj -> C:\Users\lanca\OneDrive - University of Lincoln\Documents\Parallel\Previous Assignment\OpenCL Tutorials - Tutorial 1\OpenCL Tutorials\x64\Debug\Previous Assignment.pdb (Full PDB)
+  my_kernels.cl
+          1 file(s) copied.
