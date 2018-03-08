@@ -65,13 +65,13 @@ int main(int argc, char **argv) {
 			throw err;
 		}
 		timer.Start();
-		std::ifstream input_file("temp_lincolnshire.txt", std::ios::in | std::ios::binary | std::ios::ate);
+		std::ifstream input_file("temp_linc.txt", std::ios::in | std::ios::binary | std::ios::ate);
 
 		//Get Size of File
 		std::size_t size = input_file.tellg();
 
 		std::size_t sizeBytes = size * sizeof(char);//size in bytes
-		std::size_t sizeFLTBytes = size * sizeof(float);
+		
 		std::size_t sizeIDXBytes = size * sizeof(int);
 		input_file.seekg(0, std::ios_base::beg);//Seek back to the start of the file
 
@@ -82,9 +82,10 @@ int main(int argc, char **argv) {
 		//Close the file
 		input_file.close();
 
-		vector<float> temps(size);
+		
 		vector<double> metrics(3);
 		vector<int> lines(size);
+		
 
 		// define size of buffers for OpenCL
 		cl::Buffer buffer_valCheck(context, CL_MEM_READ_WRITE, sizeBytes);
@@ -124,10 +125,14 @@ int main(int argc, char **argv) {
 
 
 		float stepsize = (float)sizeBytes / (float)lines[0];
-
+		vector<long long int> dates(lines[0]);
+		std::size_t sizeLINTBytes = size * sizeof(long long int);
+		std::size_t sizeFLTBytes = lines[0] * sizeof(float);
+		vector<float> temps(lines[0]);
 		// define size of buffers for OpenCL
 		cl::Buffer buffer_val(context, CL_MEM_READ_WRITE, sizeBytes);
 		cl::Buffer buffer_out(context, CL_MEM_READ_WRITE, sizeFLTBytes);
+		cl::Buffer buffer_dates(context, CL_MEM_READ_WRITE, sizeLINTBytes);
 		cl::Buffer buffer_metrics(context, CL_MEM_READ_WRITE, 3*sizeof(double));
 		//Copy array to device memory
 		cl::Event val_event;
@@ -139,12 +144,14 @@ int main(int argc, char **argv) {
 		kernel_splitdata.setArg(0, stepsize);
 		kernel_splitdata.setArg(1, buffer_val);
 		kernel_splitdata.setArg(2, buffer_out);
-		kernel_splitdata.setArg(3, buffer_metrics);
+		kernel_splitdata.setArg(3, buffer_dates);
+		kernel_splitdata.setArg(4, buffer_metrics);
 		// Run kernel
 		cl::Event prof_splitdata;
 		queue.enqueueNDRangeKernel(kernel_splitdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_splitdata);
 		// Retrieve output from OpenCL
-		queue.enqueueReadBuffer(buffer_out, CL_TRUE, 0, size, &temps[0]);
+		queue.enqueueReadBuffer(buffer_out, CL_TRUE, 0, lines[0], &temps[0]);
+		queue.enqueueReadBuffer(buffer_dates, CL_TRUE, 0, size, &dates[0]);
 		queue.enqueueReadBuffer(buffer_metrics, CL_TRUE, 0, 3, &metrics[0]);
 		long timetaken;
 		timetaken = (prof_splitdata.getProfilingInfo<CL_PROFILING_COMMAND_END>() - prof_splitdata.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Kernel execution time
