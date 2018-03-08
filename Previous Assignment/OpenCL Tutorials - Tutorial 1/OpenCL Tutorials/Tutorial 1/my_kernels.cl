@@ -50,30 +50,51 @@ __kernel void scan_add_atomic(__global int* checked, __global int* checkedidx) {
 		atomic_add(&checkedidx[i], checked[id]);
 }
 
-__kernel void splitdata(const float stepsize, __global const char* val,  __global float* out, __global double* metrics) {
+__kernel void splitdata(const float stepsize, __global const char* val, __global float* temps, __global long long int* dates, __global double* metrics) {
 	int id  = get_global_id(0);
-	float temp = 0;
-	float digit;
-	float div = 10.0;
+	
 	if (val[id] == '\n') 
 	{
+		float temp = 0;
+		float digit;
+		int dated;
+		long long int date = 0;
+		float div = 10.0;
+		int idx = floor(id / stepsize);
+
 		for (unsigned int i = 5; i > 1; i--) {
 			if(val[id-(i)] != ' ' && val[id-(i)] != '.') 
 			{
-				digit = val[id-(i)] - 48;
-				temp = (temp * 10) + digit;
+				if (val[id - (i + 1)] != ' ') {
+					digit = val[id - (i)] - 48;
+					temp = (temp * 10) + digit;
+				}
 			}
 		}
 		temp = temp / div;
+		int spacecount = 0;
+		for (unsigned int j = 22; j > 5; j--) {
+			if (val[id - (j)] != ' ' && spacecount < 6 && (val[id - (j)] - 48) < 10) {
+				dated = val[id - (j)] - 48;
+				date = (date * 10) + dated;
+			}
+			else {
+				spacecount += 1;
+			}
+		}
+		
 		metrics[2] = metrics[2] + temp;
-		int idx = floor(id / stepsize);
-		out[idx - 1] = temp;
+		
+		temps[idx - 1] = temp;
+		dates[idx] = date;
+		
+	    printf("index: %i value %i", idx, date);
 		if(temp < metrics[0]) { 
 			metrics[0] = temp;
 		}
 		if (temp > metrics[1]) {
 			metrics[1] = temp;
 		}
-		//printf("METRICS 0: %f METRICS 1: %f METRICS 2: %f", metrics[0], metrics[1], metrics[2]);
+
 	 }
 }
