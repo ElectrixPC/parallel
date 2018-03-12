@@ -50,6 +50,48 @@ __kernel void scan_add_atomic(__global int* checked, __global int* checkedidx) {
 		atomic_add(&checkedidx[i], checked[id]);
 }
 
+__kernel void justsplitdata(const float stepsize, __global const char* val, __global float* out) {
+	int id = get_global_id(0);
+	int size = get_global_size(0);
+	int idx = 0;
+	int prev = 0;
+	float temp = 0;
+	float digit;
+	float div = 10.0;
+	if (val[id] == '\n')
+	{
+		for (unsigned int i = 5; i > 1; i--) {
+			if (val[id - (i)] != ' ' && val[id - (i)] != '.')
+			{
+				digit = val[id - (i)] - 48;
+				temp = (temp * 10) + digit;
+			}
+		}
+		temp = temp / div;
+		
+		for (unsigned int j = 35; j > 28; j--) { 
+			if (val[id - (j)] == '\n') {
+				prev = id - (j);
+				break;
+			}
+		}
+		if (floor(id / stepsize) == floor((prev) / stepsize)) {
+			idx = floor((id) / stepsize) + 100;
+			printf("ID: %i IDX: %i ", id, idx);
+		}
+		else {
+			idx = floor(id / stepsize);
+		}
+		
+		
+		//printf("IDX %i, ID %i, PREV %i, val %f, prev: %f ", idx, id, prev, id / stepsize, prev / stepsize);
+		out[idx-1] = temp;
+		//printf("%i, %f  prev: %f ", idx, floor(id / stepsize), floor((id - 1) / stepsize));
+		//printf("ID: %i TEMP: %f -- %c %c %c %c", id, temp, val[id-5], val[id-4], val[id-3], val[id-2]);
+	}
+}
+
+
 __kernel void splitdata(const float stepsize, __global const char* val, __global float* temps, __global long long int* dates, __global double* metrics) {
 	int id  = get_global_id(0);
 	
@@ -88,7 +130,6 @@ __kernel void splitdata(const float stepsize, __global const char* val, __global
 		temps[idx - 1] = temp;
 		dates[idx] = date;
 		
-	    printf("index: %i value %i", idx, date);
 		if(temp < metrics[0]) { 
 			metrics[0] = temp;
 		}
