@@ -25,11 +25,14 @@ __kernel void multiadd(__global const int* A, __global const int* B, __global in
 
 __kernel void groupdata(__global const char* val, __global int* out) {
 	int id = get_global_id(0);
+	int myval = 0;
+
 	if (val[id] == '\n') 
 	{
 		atomic_add(&out[0], 1);
 	} 
 }
+
 
 __kernel void linedata(__global const char* val, __global int* out) {
 	int id = get_global_id(0);
@@ -43,6 +46,8 @@ __kernel void linedata(__global const char* val, __global int* out) {
 	printf("ID: %i SIZE: %i", id, out);
 }
 
+
+
 __kernel void scan_add_atomic(__global int* checked, __global int* checkedidx) {
 	int id = get_global_id(0);
 	int N = get_global_size(0);
@@ -50,7 +55,7 @@ __kernel void scan_add_atomic(__global int* checked, __global int* checkedidx) {
 		atomic_add(&checkedidx[i], checked[id]);
 }
 
-__kernel void justsplitdata(const float stepsize, __global const char* val, __global float* out) {
+__kernel void justsplitdata(const float stepsize, __global const char* val, __global float* out ) {
 	int id = get_global_id(0);
 	int size = get_global_size(0);
 	int idx = 0;
@@ -67,27 +72,16 @@ __kernel void justsplitdata(const float stepsize, __global const char* val, __gl
 				temp = (temp * 10) + digit;
 			}
 		}
+		 
 		temp = temp / div;
-		
-		for (unsigned int j = 35; j > 28; j--) { 
-			if (val[id - (j)] == '\n') {
-				prev = id - (j);
-				break;
-			}
+		if(temp == 0.0) {
+			temp = -1.0;
 		}
-		if (floor(id / stepsize) == floor((prev) / stepsize)) {
-			idx = floor((id) / stepsize) + 100;
-			printf("ID: %i IDX: %i ", id, idx);
-		}
-		else {
-			idx = floor(id / stepsize);
-		}
+
+		idx = floor(id / stepsize);
 		
-		
-		//printf("IDX %i, ID %i, PREV %i, val %f, prev: %f ", idx, id, prev, id / stepsize, prev / stepsize);
 		out[idx-1] = temp;
-		//printf("%i, %f  prev: %f ", idx, floor(id / stepsize), floor((id - 1) / stepsize));
-		//printf("ID: %i TEMP: %f -- %c %c %c %c", id, temp, val[id-5], val[id-4], val[id-3], val[id-2]);
+		
 	}
 }
 
