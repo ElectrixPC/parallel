@@ -82,78 +82,66 @@ int main(int argc, char **argv) {
 		//Close the file
 		input_file.close();
 
-		
-		
-		//vector<int> lines(size);
+		std::cout << "Time taken to open file [ms]:" << timer.End() << endl;
 
-		//// define size of buffers for OpenCL
-		//cl::Buffer buffer_valCheck(context, CL_MEM_READ_WRITE, sizeBytes);
-		//cl::Buffer buffer_outCheck(context, CL_MEM_READ_WRITE, sizeIDXBytes);
-		////Copy array to device memory
-		//cl::Event valCheck_event;
-		//queue.enqueueWriteBuffer(buffer_valCheck, CL_TRUE, 0, sizeBytes, &inputElements[0], NULL, &valCheck_event);
-		//// Create kernel instance
-		//cl::Kernel kernel_groupdata = cl::Kernel(program, "groupdata");
-		//// Set arguments for kernel (in and out)
-		//kernel_groupdata.setArg(0, buffer_valCheck);
-		//kernel_groupdata.setArg(1, buffer_outCheck);
-		//// Run kernel
-		//cl::Event prof_groupdata;
-		//queue.enqueueNDRangeKernel(kernel_groupdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_groupdata);
-		//// Retrieve output from OpenCL
-		//queue.enqueueReadBuffer(buffer_outCheck, CL_TRUE, 0, size, &lines[0]);
+		//vector<unsigned int> minline(1);
 
-		// do this serial as the cost to transfer the data is higher
+		cl::Buffer buffer_val(context, CL_MEM_READ_ONLY, sizeBytes);
+		//cl::Buffer buffer_minline(context, CL_MEM_READ_WRITE, 1 * sizeof(unsigned int));
+		cl::Event val_event;
 
+		queue.enqueueWriteBuffer(buffer_val, CL_TRUE, 0, sizeBytes, &inputElements[0], NULL, &val_event);
 
-		int currmin = 99999;
-		int prev = 0;
-		for (int i = 0; i < size; i++) {
-			prev++;
-			if (inputElements[i] == '\n') {
-				if (currmin > prev) {
-					currmin = prev;
-				}
-				prev = 0;;
-			}
-		}
-		int lines = size / currmin;
-		vector<int> metrics(pow(25, 2));
-		float stepsize = currmin - 2;
+		//cl::Kernel kernel_getminline = cl::Kernel(program, "getminline");
+		//kernel_getminline.setArg(0, buffer_val);
+		//kernel_getminline.setArg(1, buffer_minline);
+		//cl::Event prof_getminline;
+		//queue.enqueueNDRangeKernel(kernel_getminline, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_getminline);
+		// Retrieve output from OpenCL
+		//queue.enqueueReadBuffer(buffer_minline, CL_TRUE, 0, 1, &minline[0]);
+
+		//std::cout << "Time taken to run for loop [ms]:" << timer.End() << endl;
+		//long timetakenMin;
+		//timetakenMin = (prof_getminline.getProfilingInfo<CL_PROFILING_COMMAND_END>() - prof_getminline.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Kernel execution time
+		//timetakenMin += (val_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - val_event.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Memory transfer time
+
+		//std::cout << "Time taken to get line min [ms]:" << timetakenMin << endl;
+
+		//int lines = size / minline[0];
+		vector<int> hist(pow(25, 2));
+		vector<float> metrics(10);
+		//float stepsize = minline[0] - 2;
 		//vector<long long int> dates(lines);
 		//std::size_t sizeLINTBytes = size * sizeof(long long int);
-		std::size_t sizeFLTBytes = (lines * 1.1) * sizeof(float);
-		vector<float> temps(lines);
+		//std::size_t sizeFLTBytes = (lines * 1.1) * sizeof(float);
+		//vector<float> temps(lines);
 		// define size of buffers for OpenCL
-		cl::Buffer buffer_val(context, CL_MEM_READ_WRITE, sizeBytes);
-		cl::Buffer buffer_out(context, CL_MEM_READ_WRITE, sizeFLTBytes);
-		//cl::Buffer buffer_dates(context, CL_MEM_READ_WRITE, sizeLINTBytes);
-		cl::Buffer buffer_metrics(context, CL_MEM_READ_WRITE, pow(25,2)*sizeof(int));
+		
+		//cl::Buffer buffer_out(context, CL_MEM_READ_WRITE, sizeFLTBytes);
+		cl::Buffer buffer_hist(context, CL_MEM_READ_WRITE, pow(25, 2) * sizeof(float));
+		cl::Buffer buffer_metrics(context, CL_MEM_READ_WRITE, 10*sizeof(int));
 		//Copy array to device memory
-		cl::Event val_event;
 		cl::Event idx_event;
-		queue.enqueueWriteBuffer(buffer_val, CL_TRUE, 0, sizeBytes, &inputElements[0], NULL, &val_event);
 		// Create kernel instance
 		cl::Kernel kernel_splitdata = cl::Kernel(program, "splithistdata");
 		// Set arguments for kernel (in and out)
-		kernel_splitdata.setArg(0, stepsize);
-		kernel_splitdata.setArg(1, buffer_val);
-		kernel_splitdata.setArg(2, buffer_out);
-		//kernel_splitdata.setArg(3, buffer_dates);
-		kernel_splitdata.setArg(3, buffer_metrics);
+		//kernel_splitdata.setArg(0, stepsize);
+		kernel_splitdata.setArg(0, buffer_val);
+		//kernel_splitdata.setArg(2, buffer_out);
+		kernel_splitdata.setArg(1, buffer_hist);
+		kernel_splitdata.setArg(2, buffer_metrics);
 		// Run kernel
 		cl::Event prof_splitdata;
+
+		std::cout << "Time taken to set up kernel [ms]:" << timer.End() << endl;
+
 		queue.enqueueNDRangeKernel(kernel_splitdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_splitdata);
 		// Retrieve output from OpenCL
-		queue.enqueueReadBuffer(buffer_out, CL_TRUE, 0, lines, &temps[0]);
-		//queue.enqueueReadBuffer(buffer_dates, CL_TRUE, 0, lines[0], &dates[0]);
-		queue.enqueueReadBuffer(buffer_metrics, CL_TRUE, 0, pow(25,2), &metrics[0]);
+		//queue.enqueueReadBuffer(buffer_out, CL_TRUE, 0, lines, &temps[0]);
+		queue.enqueueReadBuffer(buffer_hist, CL_TRUE, 0, pow(25, 2), &hist[0]);
+		queue.enqueueReadBuffer(buffer_metrics, CL_TRUE, 0, 10, &metrics[0]);
 
-
-		std::cout << "Time taken to run program [ms]:" << timer.End() << endl;
-
-
-		vector<float> mymax(lines);
+		/*vector<float> mymax(lines);
 		vector<float> mymin(lines);
 
 		cl::Event max_event;
@@ -174,13 +162,14 @@ int main(int argc, char **argv) {
 
 		cl::Event prof_mymin;
 		queue.enqueueNDRangeKernel(kernel_mymin, cl::NullRange, cl::NDRange(lines), cl::NullRange, NULL, &prof_mymin);
-		queue.enqueueReadBuffer(buffer_min, CL_TRUE, 0, lines, &mymin[0]);
+		queue.enqueueReadBuffer(buffer_min, CL_TRUE, 0, lines, &mymin[0]);*/
 
 		long timetaken;
 		timetaken = (prof_splitdata.getProfilingInfo<CL_PROFILING_COMMAND_END>() - prof_splitdata.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Kernel execution time
-		timetaken += (val_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - val_event.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Memory transfer time
+		std::cout << "Time taken to run kernel [ms]:" << timetaken << endl;
+		timetaken = (val_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - val_event.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Memory transfer time
 
-		std::cout << "Time taken to parse file [ms]:" << timetaken << endl;
+		std::cout << "Time taken to transfer memory to kernel [ms]:" << timetaken << endl;
 		std::cout << "Time taken to run program [ms]:" << timer.End() << endl;
 		std::getchar();
 
