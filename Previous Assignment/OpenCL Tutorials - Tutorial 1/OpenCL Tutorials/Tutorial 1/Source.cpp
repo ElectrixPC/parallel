@@ -108,8 +108,8 @@ vector<float> justParseData(char* inputElements, int size, cl::Context context, 
 	timetakenMin += (val_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - val_event.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Memory transfer time
 
 	std::cout << "Time taken to get line min [ms]:" << timetakenMin << endl;
-
-	int lines = size / minline[0];
+	// TODO CALCULATE THE MIN LINES TO GET ALL THE VALUES
+	int lines = size / 5;
 
 	float stepsize = minline[0] - 2;
 	std::size_t sizeFLTBytes = (lines * 1.1) * sizeof(float);
@@ -133,35 +133,44 @@ vector<float> justParseData(char* inputElements, int size, cl::Context context, 
 	// Retrieve output from OpenCL
 	queue.enqueueReadBuffer(buffer_out, CL_TRUE, 0, lines, &temps[0]);
 
-	vector<float> mean(lines);
-	cl::Buffer buffer_mean(context, CL_MEM_READ_WRITE, multiSizeFLTBytes);
-	cl::Kernel kernel_getmean = cl::Kernel(program, "reduce_add_3");
-	// Set arguments for kernel (in and out)
-	kernel_getmean.setArg(0, buffer_out);
-	kernel_getmean.setArg(1, buffer_mean);
-	kernel_getmean.setArg(2, cl::Local(8 * sizeof(float)));//local memory size
-
-	
-	//cl::Event prof_meandata;
-
-	//queue.enqueueNDRangeKernel(kernel_getmean, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_meandata);
-	//// Retrieve output from OpenCL
-	//queue.enqueueReadBuffer(buffer_mean, CL_TRUE, 0, lines, &mean[0]);
-
-
-	//float mytotal = 0;
-	//for (int i = 0; i < lines; i++) {
-	//	if (i % 8 == 0) {
-	//		mytotal += mean[i];
-	//	}
-	//}
-
 	long timetakenParse;
 	timetakenParse = (prof_parsedata.getProfilingInfo<CL_PROFILING_COMMAND_END>() - prof_parsedata.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Kernel execution time
 
 	std::cout << "Time taken to parse [ms]:" << timetakenParse << endl;
-	//std::cout << mytotal << endl;
+	
 	return temps;
+}
+
+float getMeanValue(vector<float> temps, int lines, cl::Context context, cl::CommandQueue queue, cl::Program program)
+{
+	vector<float> mean(lines);
+	std::size_t sizeFLTBytes = lines  * sizeof(float);
+	cl::Buffer buffer_temps(context, CL_MEM_READ_WRITE, sizeFLTBytes);
+	cl::Buffer buffer_mymean(context, CL_MEM_READ_WRITE, sizeFLTBytes);
+
+	cl::Event mean_event;
+
+	queue.enqueueWriteBuffer(buffer_temps, CL_TRUE, 0, lines, &temps[0], NULL, &mean_event);
+
+	cl::Kernel kernel_getmymean = cl::Kernel(program, "sum");
+	// Set arguments for kernel (in and out)
+	kernel_getmymean.setArg(0, buffer_temps);
+	kernel_getmymean.setArg(1, buffer_mymean);
+	kernel_getmymean.setArg(2, cl::Local(256 * sizeof(float)));//local memory size
+
+
+	cl::Event prof_meandata;
+
+	queue.enqueueNDRangeKernel(kernel_getmymean, cl::NullRange, cl::NDRange(lines), cl::NullRange, NULL, &prof_meandata);
+	// Retrieve output from OpenCL
+	queue.enqueueReadBuffer(buffer_mymean, CL_TRUE, 0, lines, &mean[0]);
+
+	// TODO get the number of lines to get the mean value
+	float meanValue = mean[0] / (lines);
+
+	std::cout << meanValue << endl;
+
+	return meanValue;
 }
 
 
@@ -230,9 +239,10 @@ int main(int argc, char **argv) {
 		std::cout << "Time taken to open file [ms]:" << timer.End() << endl;
 
 		//vector<unsigned int> minline(1);
-		vector<float> temps = justParseData(inputElements, size, context, queue, program);
+		//vector<float> temps = justParseData(inputElements, size, context, queue, program);
+		//float mean = getMeanValue(temps, temps.size(), context, queue, program);
 		//parseGetHist(inputElements, size, context, queue, program);
-		//parseGetHistMetrics(inputElements, size, context, queue, program);
+		parseGetHistMetrics(inputElements, size, context, queue, program);
 		std::cout << "Total time taken to complete everything [ms]:" << timer.End() << endl;
 
 		//cl::Buffer buffer_val(context, CL_MEM_READ_ONLY, sizeBytes);
