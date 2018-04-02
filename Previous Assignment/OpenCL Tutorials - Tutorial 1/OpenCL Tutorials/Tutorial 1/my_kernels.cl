@@ -74,7 +74,7 @@ __kernel void getminline(__global const char* data, __global unsigned int *minli
 }
 
 //reduce using local memory (so called privatisation)
-__kernel void reduce_add_3(__global const float* A, __global float* B, __local float* scratch) {
+__kernel void sum(__global const float* A, __global float* B, __local float* scratch) {
 	int id = get_global_id(0);
 	int lid = get_local_id(0);
 	int N = get_local_size(0);
@@ -85,15 +85,30 @@ __kernel void reduce_add_3(__global const float* A, __global float* B, __local f
 	barrier(CLK_LOCAL_MEM_FENCE);//wait for all local threads to finish copying from global to local memory
 
 	for (int i = 1; i < N; i *= 2) {
-		if (!(lid % (i * 2)) && ((lid + i) < N))
+		if (!(lid % (i * 2)) && ((lid + i) < N)) {
 			scratch[lid] += scratch[lid + i];
-
+		}
+		
 		barrier(CLK_LOCAL_MEM_FENCE);
+
 	}
 
-	//copy the cache to output array
-	AtomicAdd(&B[id], scratch[lid]);
+
+	if (lid == 0) {
+		B[get_group_id(0)] = scratch[lid];
+
+		barrier(CLK_LOCAL_MEM_FENCE);
+		if (id == 0) {
+
+			int group_count = get_num_groups(0);
+			for (int i = 1; i < group_count; ++i) {
+				B[id] += B[i];
+			}
+		}
+
+	}
 }
+
 
 //flexible step reduce 
 __kernel void reduce_add_2(__global const float* A, __global float* B) {
@@ -120,21 +135,42 @@ __kernel void justparsedata(const float stepsize, __global const char* val, __gl
 	float temp = 0;
 	float digit;
 	float div = 10.0;
+	bool negative = false;
 	if (val[id] == '\n')
 	{
-		for (unsigned int i = 5; i > 1; i--) {
-			if (val[id - (i)] != ' ' && val[id - (i)] != '.')
+		for (unsigned int i = 6; i > 1; i--) {
+			if (i == 6 && val[id - (i)] == '-') {
+				negative = true;
+				continue;
+			}
+			else if (i == 6) {
+				continue;
+			}
+
+			if (val[id - (i)] != ' ' && val[id - (i)] != '.' && i != 6)
 			{
-				digit = val[id - (i)] - 48;
-				temp = (temp * 10) + digit;
+				if (val[id - (i)] == '-') {
+					negative = true;
+				}
+				else {
+					digit = val[id - (i)] - 48;
+					temp = (temp * 10) + digit;
+				}
 			}
 		}
-		 
+		
 		temp = temp / div;
+		
 		if(temp == 0.0) {
-			temp = -1.0;
+			temp = -99.0;
 		}
-
+		
+		if (negative == true) {
+			temp = temp - (temp * 2);
+		}
+		if (temp > 31.5) {
+			printf("ID %i, Val %f", id, temp);
+		}
 		idx = floor(id / stepsize);
 		
 		out[idx-1] = temp;
@@ -146,19 +182,38 @@ __kernel void splithistdata(__global const char* val, __global int* hist, __glob
 	unsigned int id = get_global_id(0);
 	
 	if (val[id] == '\n')
-	{
+	{	
 		float temp = 0;
+		float digit;
 		float div = 10.0;
+		bool negative = false;
 
-		for (unsigned int i = 5; i > 1; i--) {
-			char value = val[id - (i)];
-			if (value != ' ' && value != '.')
+		for (unsigned int i = 6; i > 1; i--) {
+			if (i == 6 && val[id - (i)] == '-') {
+				negative = true;
+				continue;
+			}
+			else if (i == 6) {
+				continue;
+			}
+
+			if (val[id - (i)] != ' ' && val[id - (i)] != '.' && i != 6)
 			{
-				temp = (temp * 10) + (value - 48);
+				if (val[id - (i)] == '-') {
+					negative = true;
+				}
+				else {
+					digit = val[id - (i)] - 48;
+					temp = (temp * 10) + digit;
+				}
 			}
 		}
 
 		temp = temp / div;
+
+		if (negative == true) {
+			temp = temp - (temp * 2);
+		}
 		
 		if (temp < -10) {
 			atomic_inc(&hist[0]);
@@ -188,17 +243,36 @@ __kernel void parsehistdata(__global const char* val, __global int* hist) {
 	if (val[id] == '\n')
 	{
 		float temp = 0;
+		float digit;
 		float div = 10.0;
+		bool negative = false;
 
-		for (unsigned int i = 5; i > 1; i--) {
-			char value = val[id - (i)];
-			if (value != ' ' && value != '.')
+		for (unsigned int i = 6; i > 1; i--) {
+			if (i == 6 && val[id - (i)] == '-') {
+				negative = true;
+				continue;
+			}
+			else if (i == 6) {
+				continue;
+			}
+
+			if (val[id - (i)] != ' ' && val[id - (i)] != '.' && i != 6)
 			{
-				temp = (temp * 10) + (value - 48);
+				if (val[id - (i)] == '-') {
+					negative = true;
+				}
+				else {
+					digit = val[id - (i)] - 48;
+					temp = (temp * 10) + digit;
+				}
 			}
 		}
 
 		temp = temp / div;
+
+		if (negative == true) {
+			temp = temp - (temp * 2);
+		}
 
 		if (temp < -10) {
 			atomic_inc(&hist[0]);
