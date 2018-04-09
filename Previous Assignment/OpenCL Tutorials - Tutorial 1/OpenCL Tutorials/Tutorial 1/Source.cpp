@@ -1,5 +1,13 @@
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #define __CL_ENABLE_EXCEPTIONS
+#ifdef LARGE
+#define LOCAL_SIZE_LIMIT 512
+#define DATA_SIZE 4096
+#else
+#define LOCAL_SIZE_LIMIT 32
+#define DATA_SIZE 128
+#endif
+
 
 #include <iostream>
 #include <vector>
@@ -240,77 +248,95 @@ vector<float> histParseData(char* inputElements, int size, cl::Context context, 
 vector<float> getSorted(vector<float> temps, int lines, cl::Context context, cl::CommandQueue queue, cl::Program program)
 {
 
-	////float actualSize = temps[lines - 1];
-	////temps[lines - 1] = 0.0;
-	int local_size = 1024;
 
-	size_t padding_size = temps.size() % local_size;
+	auto optimal_size = static_cast<std::vector<float>::size_type>(pow(2, ceil(log(temps.size()) / log(2))));
 	
 	//if the input vector is not a multiple of the local_size
 	//insert additional neutral elements (0 for addition) so that the total will not be affected
-	if (padding_size) {
+	if (optimal_size) {
 		//create an extra vector with neutral values
-		std::vector<int> A_ext(local_size - padding_size, 0);
+		std::vector<int> A_ext(optimal_size - temps.size(), 0);
 		//append that extra vector to our input
 		temps.insert(temps.end(), A_ext.begin(), A_ext.end());
 	}
 
 	lines = temps.size();
-	std::size_t sizeFLTBytes = lines * sizeof(int);
+	std::size_t sizeFLTBytes = lines * sizeof(float);
+
+
 	cl::Buffer data_buffer(context, CL_MEM_READ_WRITE, sizeFLTBytes);
-	cl::Buffer sort_buffer(context, CL_MEM_READ_WRITE, sizeFLTBytes);
+	cl::Buffer output_buffer(context, CL_MEM_READ_WRITE, sizeFLTBytes);
+
 	cl::Event mean_event;
 
-	//queue.enqueueWriteBuffer(buffer_temps, CL_TRUE, 0, lines, &temps[0], NULL, &mean_event);
-
-	//cl::Kernel kernel_sortdata = cl::Kernel(program, "sort_bitonic");
-	//// Set arguments for kernel (in and out)
-	//kernel_sortdata.setArg(0, buffer_temps);
-
-
-	//cl::Event prof_sortdata;
-
-	//queue.enqueueNDRangeKernel(kernel_sortdata, cl::NullRange, cl::NDRange(lines), cl::NullRange, NULL, &prof_sortdata);
-	//// Retrieve output from OpenCL
-	//queue.enqueueReadBuffer(buffer_temps, CL_TRUE, 0, lines, &temps[0]);
-
-	//// TODO get the number of lines to get the mean value
-
-	//return temps;
-
-		int merge = 0;
-
 	queue.enqueueWriteBuffer(data_buffer, CL_TRUE, 0, lines, &temps[0], NULL, &mean_event);
-	queue.enqueueFillBuffer(sort_buffer, 0, 0, sizeFLTBytes);
+
 	//Configure kernels and queue them for execution
-	cl::Kernel sort_kernel = cl::Kernel(program, "sort_FLOAT");
-	sort_kernel.setArg(0, data_buffer);
-	sort_kernel.setArg(1, sort_buffer);
-	sort_kernel.setArg(2, cl::Local(local_size * sizeof(float)));
-	sort_kernel.setArg(3, merge);
+	cl::Kernel init_bitonic = cl::Kernel(program, "init_bitonic");
+	cl::Kernel bitonic_merge_global = cl::Kernel(program, "bitonic_merge_global");
+	cl::Kernel bitonic_merge_local = cl::Kernel(program, "bitonic_merge_local");
+
+	init_bitonic.setArg(0, data_buffer);
+	init_bitonic.setArg(1, output_buffer);
 
 	//Create vector to read final values
 	vector<float> output(lines);
 	cl::Event prof_sortdata;
+	
+	unsigned int arrayLength = lines;
+	unsigned int batch = lines / arrayLength;
+	size_t global = batch * lines / 2;
+	size_t local = LOCAL_SIZE_LIMIT / 2;
+	int dir = 1;
 	//Initially call the kernel so that the input buffer can be replaced with the modified/sorted data
-	queue.enqueueNDRangeKernel(sort_kernel, cl::NullRange, cl::NDRange(lines), cl::NDRange(local_size), NULL, &prof_sortdata);
+	queue.enqueueNDRangeKernel(init_bitonic, cl::NullRange, cl::NDRange(global), cl::NDRange(local), NULL, &prof_sortdata);
 
-	sort_kernel.setArg(0, sort_buffer);
+	unsigned int total = 0;
+	for (unsigned int size = 2 * LOCAL_SIZE_LIMIT; size <= arrayLength; size <<= 1) {
+		for (unsigned stride = size / 2; stride > 0; stride >>= 1) {
+			total++;
+		}
+	}
 
-	do {
-			//Flip the merge flag and set it
-			merge = !merge;
-			sort_kernel.setArg(3, merge);
+	unsigned int run = 0;
+	for (unsigned int size = 2 * LOCAL_SIZE_LIMIT; size <= arrayLength; size <<= 1) {
+		for (unsigned stride = size / 2; stride > 0; stride >>= 1) {
+			run++;
 
-			//Queue and execute the kernel
-			queue.enqueueNDRangeKernel(sort_kernel, cl::NullRange, cl::NDRange(lines), cl::NDRange(local_size), NULL, &prof_sortdata);
+			if (stride >= LOCAL_SIZE_LIMIT) {
 
-			//Read the buffer and wait for it to finish then check if the kernel is sorted
-			//If not, repeat from top of the loop
-		queue.enqueueReadBuffer(sort_buffer, CL_TRUE, 0, lines, &output[0]);
-		queue.finish();
-	} while (!std::is_sorted(output.begin(), output.end()));
+				bitonic_merge_global.setArg(0, output_buffer);
+				bitonic_merge_global.setArg(1, output_buffer);
+				bitonic_merge_global.setArg(2, arrayLength);
+				bitonic_merge_global.setArg(3, size);
+				bitonic_merge_global.setArg(4, stride);
+				bitonic_merge_global.setArg(5, dir);
+				
 
+				printf("starting kernel MergeGlobal %2d out of %d (size %4u stride %4u)\n", run, total, size, stride);
+
+				bitonic_merge_local.setArg(0, output_buffer);
+				queue.enqueueNDRangeKernel(bitonic_merge_global, cl::NullRange, cl::NDRange(global), cl::NDRange(local), NULL, NULL);
+
+			}
+			else {
+				bitonic_merge_local.setArg(0, output_buffer);
+				bitonic_merge_local.setArg(1, output_buffer);
+				bitonic_merge_local.setArg(2, arrayLength);
+				bitonic_merge_local.setArg(3, size);
+				bitonic_merge_local.setArg(4, stride);
+				bitonic_merge_local.setArg(5, dir);
+
+
+				printf("starting kernel MergeLocal  %2d out of %d (size %4u stride %4u)\n", run, total, size, stride);
+
+				queue.enqueueNDRangeKernel(bitonic_merge_local, cl::NullRange, cl::NDRange(global), cl::NDRange(local), NULL, NULL);
+
+			}
+		}
+	}
+	queue.enqueueReadBuffer(output_buffer, CL_TRUE, 0, lines, &output[0]);
+	
 	return output;
 }
 
@@ -417,100 +443,15 @@ int main(int argc, char **argv) {
 		//vector<unsigned int> minline(1);
 		//vector<float> temps = justParseData(inputElements, size, context, queue, program);
 		vector<float> temps = histParseData(inputElements, size, context, queue, program);
-		//vector<int> temps = {1, 2, 4, 7, 12, 11, 6, 4, 2, 1};
-		//temps = getSorted(temps, temps.size(), context, queue, program); 
-		std::cout << "Time taken to parse data & get metrics file [ms]:" << timer.End() << endl;
-		float mean = getMeanValue(temps, temps.size(), context, queue, program);
+		std::cout << "Time taken to parse [ms]:" << timer.End() << endl;
+		//float mean = getMeanValue(temps, temps.size(), context, queue, program);
+		std::cout << "Time taken to get mean [ms]:" << timer.End() << endl;
+		temps = getSorted(temps, temps.size(), context, queue, program); 
+		//std::cout << "Time taken to parse data & get metrics file [ms]:" << timer.End() << endl;
+		
 		//parseGetHist(inputElements, size, context, queue, program);
 		//parseGetHistMetrics(inputElements, size, context, queue, program);
 		std::cout << "Total time taken to complete everything [ms]:" << timer.End() << endl;
-
-		//cl::Buffer buffer_val(context, CL_MEM_READ_ONLY, sizeBytes);
-		////cl::Buffer buffer_minline(context, CL_MEM_READ_WRITE, 1 * sizeof(unsigned int));
-		//cl::Event val_event;
-
-		//queue.enqueueWriteBuffer(buffer_val, CL_TRUE, 0, sizeBytes, &inputElements[0], NULL, &val_event);
-
-		////cl::Kernel kernel_getminline = cl::Kernel(program, "getminline");
-		////kernel_getminline.setArg(0, buffer_val);
-		////kernel_getminline.setArg(1, buffer_minline);
-		////cl::Event prof_getminline;
-		////queue.enqueueNDRangeKernel(kernel_getminline, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_getminline);
-		//// Retrieve output from OpenCL
-		////queue.enqueueReadBuffer(buffer_minline, CL_TRUE, 0, 1, &minline[0]);
-
-		////std::cout << "Time taken to run for loop [ms]:" << timer.End() << endl;
-		////long timetakenMin;
-		////timetakenMin = (prof_getminline.getProfilingInfo<CL_PROFILING_COMMAND_END>() - prof_getminline.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Kernel execution time
-		////timetakenMin += (val_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - val_event.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Memory transfer time
-
-		////std::cout << "Time taken to get line min [ms]:" << timetakenMin << endl;
-
-		////int lines = size / minline[0];
-		//vector<int> hist(pow(25, 2));
-		//vector<float> metrics(10);
-		////float stepsize = minline[0] - 2;
-		////vector<long long int> dates(lines);
-		////std::size_t sizeLINTBytes = size * sizeof(long long int);
-		////std::size_t sizeFLTBytes = (lines * 1.1) * sizeof(float);
-		////vector<float> temps(lines);
-		//// define size of buffers for OpenCL
-		//
-		////cl::Buffer buffer_out(context, CL_MEM_READ_WRITE, sizeFLTBytes);
-		//cl::Buffer buffer_hist(context, CL_MEM_READ_WRITE, pow(25, 2) * sizeof(float));
-		//cl::Buffer buffer_metrics(context, CL_MEM_READ_WRITE, 10*sizeof(int));
-		////Copy array to device memory
-		//cl::Event idx_event;
-		//// Create kernel instance
-		//cl::Kernel kernel_splitdata = cl::Kernel(program, "splithistdata");
-		//// Set arguments for kernel (in and out)
-		////kernel_splitdata.setArg(0, stepsize);
-		//kernel_splitdata.setArg(0, buffer_val);
-		////kernel_splitdata.setArg(2, buffer_out);
-		//kernel_splitdata.setArg(1, buffer_hist);
-		//kernel_splitdata.setArg(2, buffer_metrics);
-		//// Run kernel
-		//cl::Event prof_splitdata;
-
-		//std::cout << "Time taken to set up kernel [ms]:" << timer.End() << endl;
-
-		//queue.enqueueNDRangeKernel(kernel_splitdata, cl::NullRange, cl::NDRange(size), cl::NullRange, NULL, &prof_splitdata);
-		//// Retrieve output from OpenCL
-		////queue.enqueueReadBuffer(buffer_out, CL_TRUE, 0, lines, &temps[0]);
-		//queue.enqueueReadBuffer(buffer_hist, CL_TRUE, 0, pow(25, 2), &hist[0]);
-		//queue.enqueueReadBuffer(buffer_metrics, CL_TRUE, 0, 10, &metrics[0]);
-
-		//*vector<float> mymax(lines);
-		//vector<float> mymin(lines);
-
-		//cl::Event max_event;
-		//cl::Event min_event;
-
-		//cl::Buffer buffer_max(context, CL_MEM_READ_WRITE, sizeFLTBytes);
-		//cl::Buffer buffer_min(context, CL_MEM_READ_WRITE, sizeFLTBytes);
-		//cl::Kernel kernel_mymax = cl::Kernel(program, "mymax");
-		//cl::Kernel kernel_mymin = cl::Kernel(program, "mymin");
-		//kernel_mymax.setArg(0, buffer_out);
-		//kernel_mymax.setArg(1, buffer_max);
-		//cl::Event prof_mymax;
-		//queue.enqueueNDRangeKernel(kernel_mymax, cl::NullRange, cl::NDRange(lines), cl::NullRange, NULL, &prof_mymax);
-		//queue.enqueueReadBuffer(buffer_max, CL_TRUE, 0, lines, &mymax[0]);
-
-		//kernel_mymin.setArg(0, buffer_out);
-		//kernel_mymin.setArg(1, buffer_min);
-
-		//cl::Event prof_mymin;
-		//queue.enqueueNDRangeKernel(kernel_mymin, cl::NullRange, cl::NDRange(lines), cl::NullRange, NULL, &prof_mymin);
-		//queue.enqueueReadBuffer(buffer_min, CL_TRUE, 0, lines, &mymin[0]);*/
-
-		//long timetaken;
-		//timetaken = (prof_splitdata.getProfilingInfo<CL_PROFILING_COMMAND_END>() - prof_splitdata.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Kernel execution time
-		//std::cout << "Time taken to run kernel [ms]:" << timetaken << endl;
-		//timetaken = (val_event.getProfilingInfo<CL_PROFILING_COMMAND_END>() - val_event.getProfilingInfo<CL_PROFILING_COMMAND_START>()) / 1000000; // Memory transfer time
-
-		//std::cout << "Time taken to transfer memory to kernel [ms]:" << timetaken << endl;
-		//std::cout << "Time taken to run program [ms]:" << timer.End() << endl;
-		//std::getchar();
 
 	}
 	catch (cl::Error err) {
