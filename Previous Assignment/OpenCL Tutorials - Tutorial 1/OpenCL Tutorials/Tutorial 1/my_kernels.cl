@@ -1,10 +1,59 @@
 #define MAX_WORD_LEN 100
 #define WORK_GROUP_SIZE 128
 
+#ifdef LARGE
+#define LOCAL_SIZE_LIMIT 256
+#define DATA_SIZE 4096
+#else
+#define LOCAL_SIZE_LIMIT 32
+#define DATA_SIZE 128
+#endif
+
 typedef struct word{
     char word[MAX_WORD_LEN];
     int len;
 }word_t;
+
+inline float GetTemp(int id, __global char* val) {
+	float digit;
+	float div = 10.0;
+	bool negative = false;
+	unsigned int idx = 0;
+	float temp = 0;
+
+	for (unsigned int i = 6; i > 1; i--) {
+		if (i == 6 && val[id - (i)] == '-') {
+			negative = true;
+			continue;
+		}
+		else if (i == 6) {
+			continue;
+		}
+
+		if (val[id - (i)] != ' ' && val[id - (i)] != '.' && i != 6)
+		{
+			if (val[id - (i)] == '-') {
+				negative = true;
+			}
+			else {
+				digit = val[id - (i)] - 48;
+				temp = (temp * 10) + digit;
+			}
+		}
+	}
+
+	temp = temp / div;
+
+	if (negative == true) {
+		temp = temp - (temp * 2);
+	}
+
+	if (temp == 0.0) {
+		temp = -99.0;
+	}
+
+	return temp;
+}
 
 //Function to perform the atomic max
 inline void AtomicMax(volatile __global float *source, const float operand) {
@@ -113,113 +162,23 @@ __kernel void sum(__global const float* A, __global float* B, __local float* scr
 }
 
 
-//flexible step reduce 
-__kernel void reduce_add_2(__global const float* A, __global float* B) {
-	int id = get_global_id(0);
-	int N = get_global_size(0);
-
-	B[id] = A[id];
-
-	barrier(CLK_GLOBAL_MEM_FENCE);
-
-	for (int i = 1; i < N; i *= 2) { //i is a stride
-		if (!(id % (i * 2)) && ((id + i) < N))
-			AtomicAdd(&B[id],B[id + i]);
-
-		barrier(CLK_GLOBAL_MEM_FENCE);
-	}
-}
-
-
-
 __kernel void justparsedata(const float stepsize, __global const char* val, __global float* out ) {
 	unsigned int id = get_global_id(0);
-	unsigned int idx = 0;
-	float temp = 0;
-	float digit;
-	float div = 10.0;
-	bool negative = false;
+
 	if (val[id] == '\n')
 	{
-		for (unsigned int i = 6; i > 1; i--) {
-			if (i == 6 && val[id - (i)] == '-') {
-				negative = true;
-				continue;
-			}
-			else if (i == 6) {
-				continue;
-			}
-
-			if (val[id - (i)] != ' ' && val[id - (i)] != '.' && i != 6)
-			{
-				if (val[id - (i)] == '-') {
-					negative = true;
-				}
-				else {
-					digit = val[id - (i)] - 48;
-					temp = (temp * 10) + digit;
-				}
-			}
-		}
-		
-		temp = temp / div;
-		
-		//if(temp == 0.0) {
-		//	temp = -99.0;
-		//}
-		
-		if (negative == true) {
-			temp = temp - (temp * 2);
-		}
-
-		idx = floor(id / stepsize);
-		
-		out[idx-1] = temp;
-		
+		float temp       = GetTemp(id, val);
+		unsigned int idx = floor(id / stepsize);
+		out[idx-1]       = temp;
 	}
 }
 
-__kernel void outhistdata(const float stepsize, __global const char* val, __global float* out, __global int* hist, __global float *metrics) {
+__kernel void outhistdata(const float stepsize, __global char* val, __global float* out, __global int* hist, __global float *metrics) {
 	unsigned int id = get_global_id(0);
 
 	if (val[id] == '\n')
 	{
-		float temp = 0;
-		float digit;
-		float div = 10.0;
-		bool negative = false;
-		unsigned int idx = 0;
-
-		for (unsigned int i = 6; i > 1; i--) {
-			if (i == 6 && val[id - (i)] == '-') {
-				negative = true;
-				continue;
-			}
-			else if (i == 6) {
-				continue;
-			}
-
-			if (val[id - (i)] != ' ' && val[id - (i)] != '.' && i != 6)
-			{
-				if (val[id - (i)] == '-') {
-					negative = true;
-				}
-				else {
-					digit = val[id - (i)] - 48;
-					temp = (temp * 10) + digit;
-				}
-			}
-		}
-
-		temp = temp / div;
-
-		if (negative == true) {
-			temp = temp - (temp * 2);
-		}
-
-		idx = floor(id / stepsize);
-
-		out[idx - 1] = temp;
+		float temp = GetTemp(id, val);
 
 		if (temp < -10) {
 			atomic_inc(&hist[0]);
@@ -239,45 +198,20 @@ __kernel void outhistdata(const float stepsize, __global const char* val, __glob
 
 		AtomicMin(&metrics[0], temp);
 		AtomicMax(&metrics[1], temp);
+
+		unsigned int idx = floor(id / stepsize);
+		out[idx - 1] = temp;
+
+		
 	}
 }
 
-__kernel void splithistdata(__global const char* val, __global int* hist, __global float *metrics) {
+__kernel void parsealldata(__global const char* val, __global int* hist, __global float *metrics) {
 	unsigned int id = get_global_id(0);
 	
 	if (val[id] == '\n')
 	{	
-		float temp = 0;
-		float digit;
-		float div = 10.0;
-		bool negative = false;
-
-		for (unsigned int i = 6; i > 1; i--) {
-			if (i == 6 && val[id - (i)] == '-') {
-				negative = true;
-				continue;
-			}
-			else if (i == 6) {
-				continue;
-			}
-
-			if (val[id - (i)] != ' ' && val[id - (i)] != '.' && i != 6)
-			{
-				if (val[id - (i)] == '-') {
-					negative = true;
-				}
-				else {
-					digit = val[id - (i)] - 48;
-					temp = (temp * 10) + digit;
-				}
-			}
-		}
-
-		temp = temp / div;
-
-		if (negative == true) {
-			temp = temp - (temp * 2);
-		}
+		float temp = GetTemp(id, val);
 		
 		if (temp < -10) {
 			atomic_inc(&hist[0]);
@@ -306,37 +240,7 @@ __kernel void parsehistdata(__global const char* val, __global int* hist) {
 
 	if (val[id] == '\n')
 	{
-		float temp = 0;
-		float digit;
-		float div = 10.0;
-		bool negative = false;
-
-		for (unsigned int i = 6; i > 1; i--) {
-			if (i == 6 && val[id - (i)] == '-') {
-				negative = true;
-				continue;
-			}
-			else if (i == 6) {
-				continue;
-			}
-
-			if (val[id - (i)] != ' ' && val[id - (i)] != '.' && i != 6)
-			{
-				if (val[id - (i)] == '-') {
-					negative = true;
-				}
-				else {
-					digit = val[id - (i)] - 48;
-					temp = (temp * 10) + digit;
-				}
-			}
-		}
-
-		temp = temp / div;
-
-		if (negative == true) {
-			temp = temp - (temp * 2);
-		}
+		float temp = GetTemp(id, val);
 
 		if (temp < -10) {
 			atomic_inc(&hist[0]);
@@ -356,79 +260,117 @@ __kernel void parsehistdata(__global const char* val, __global int* hist) {
 	}
 }
 
-void cmpxchg(volatile __global int *A, __global int *B, bool dir) {
-	if ((!dir && *A > *B) || (dir && *A < *B)) {
-		int t = *A;
+inline void ComparatorPrivate(float *A, float *B, int arrowDir)
+{
+	if ((*A > *B) == arrowDir) {
+		float t;
+		t = *A;
 		*A = *B;
 		*B = t;
 	}
 }
 
-void bitonic_merge(int id, __global int* A, int N, bool dir) {
-	for (int i = N / 2; i > 0; i /= 2) {
-		if ((id % (i * 2)) < i)
-			cmpxchg(&A[id], &A[id + i], dir);
-		barrier(CLK_GLOBAL_MEM_FENCE);
-	}
-}
-
-__kernel void sort_bitonic(__global int* A) {
-	int id = get_global_id(0);
-	int N = get_global_size(0);
-	printf("A %i: ", A[id]);
-	for (int i = 1; i < N / 2; i *= 2) {
-		if (id % (i * 4) < i * 2)
-			bitonic_merge(id, A, i * 2, false);
-		else if ((id + i * 2) % (i * 4) < i * 2)
-			bitonic_merge(id, A, i * 2, true);
-		barrier(CLK_GLOBAL_MEM_FENCE);
-	}
-	bitonic_merge(id, A, N, false);
-}
-
-
-__kernel void sort_FLOAT(__global const float* in, __global float* out, __local float* scratch, int merge)
+inline void ComparatorLocal(__local float *A, __local float *B, int arrowDir)
 {
-	int id = get_global_id(0);
-	int lid = get_local_id(0);
-	int gid = get_group_id(0);
-	int N = get_local_size(0);
-
-	int max_group = (get_global_size(0) / N) - 1;
-	int offset_id = id + ((N / 2) * merge);
-
-	if (merge && gid == 0)
-	{
-		out[id] = in[id];
-		barrier(CLK_GLOBAL_MEM_FENCE);
+	if ((*A > *B) == arrowDir) {
+		float t;
+		t = *A; 
+		*A = *B; 
+		*B = t;
 	}
+}
+
+__kernel void init_bitonic(__global float* temps, __global float *output) {
+	int N = get_local_size(0);
+	int lid = get_local_id(0);
+	int id = get_global_id(0);
+	__local float A[LOCAL_SIZE_LIMIT];
+
+	async_work_group_copy(A, temps + get_group_id(0)*LOCAL_SIZE_LIMIT, LOCAL_SIZE_LIMIT, 0);
+
+	int comparator = id & ((LOCAL_SIZE_LIMIT / 2) - 1);
+
+	for (int size = 2; size < LOCAL_SIZE_LIMIT; size <<= 1) { 
+		int direction = (comparator & (size / 2)) != 0;
+
+		for (int stride = size / 2; stride > 0; stride >>= 1) {
+			barrier(CLK_LOCAL_MEM_FENCE);
+			bool modified = false;
+			int pos = 2 * lid - (lid & (stride - 1));
+			if (A[pos] == 0.0) {
+				A[pos] = 99.0;
+				modified = true;
+			}
+			if (A[pos] == -99.0) {
+				A[pos] = 0.0;
+				modified = true;
+			}
+			if (modified == false) {
+				ComparatorLocal(&A[pos], &A[pos + stride], direction);
+			}
+		}
+
+	}
+
+	int direction = (get_group_id(0) & 1);
+
+	for (int stride = LOCAL_SIZE_LIMIT / 2; stride > 0; stride >>= 1) {
+
+		barrier(CLK_LOCAL_MEM_FENCE);
+
+		int pos = 2 * lid - (lid & (stride - 1));
+		if (A[pos] != 0.0) {
+			ComparatorLocal(&A[pos], &A[pos + stride], direction);
+		}
+		else
+			A[pos] = 99.0;
+
+
+	}
+
+
+	async_work_group_copy(output + get_group_id(0)* LOCAL_SIZE_LIMIT, A, LOCAL_SIZE_LIMIT, 0);
+
+
+}
+
+__kernel void bitonic_merge_global(__global float* temps, __global float* output, int arrayLength, int size, int stride, int sortDir) {
 	
-	scratch[lid] = in[offset_id];
+	int global_comparator = get_global_id(0);
+	int comparator = global_comparator  & (arrayLength / 2 - 1);
+
+	int direction = sortDir ^ ((comparator & (size / 2)) != 0);
+	int pos = 2 * global_comparator - (global_comparator & (stride - 1));
+	float A = temps[pos];
+	float B = temps[pos + stride];
+
+	ComparatorPrivate(&A, &B, direction);
+
+	output[pos] = A;
+	output[pos + stride] = B;
+}
+
+__kernel void bitonic_merge_local(__global float* temps, __global float* output, int arrayLength, int size, int stride, int sortDir) {
+	int global_comparator = get_global_id(0);
+	int lid = get_local_id(0);
+	int comparator = global_comparator & ((arrayLength / 2) - 1);
+	int direction = sortDir ^ ((comparator & (size / 2)) != 0);
+
+
+	__local float A[LOCAL_SIZE_LIMIT];
+
+	async_work_group_copy(A, temps + get_group_id(0)*LOCAL_SIZE_LIMIT, LOCAL_SIZE_LIMIT, 0);
+
+	for (; stride > 0; stride >>= 1) {
+		barrier(CLK_LOCAL_MEM_FENCE);
+
+		int pos = 2 * lid - (lid & (stride - 1));
+		ComparatorLocal(&A[pos], &A[pos + stride], direction);
+	}
+
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	for (int l = 1; l<N; l <<= 1)
-	{
-		bool direction = ((lid & (l << 1)) != 0);
+	async_work_group_copy(output + get_group_id(0)* LOCAL_SIZE_LIMIT, A, LOCAL_SIZE_LIMIT, 0);
 
-		for (int inc = l; inc>0; inc >>= 1)
-		{
-			int j = lid ^ inc;
-			float i_data = scratch[lid];
-			float j_data = scratch[j];
 
-			bool smaller = (j_data < i_data) && j_data != 0.0 || (j_data == i_data && j < lid);
-			bool swap = smaller ^ (j < lid) ^ direction;
-
-			barrier(CLK_LOCAL_MEM_FENCE);
-
-			scratch[lid] = (swap) ? j_data : i_data;
-			barrier(CLK_LOCAL_MEM_FENCE);
-		}
-	}
-
-	out[offset_id] = scratch[lid];
-	barrier(CLK_GLOBAL_MEM_FENCE);
-
-	if (merge && gid == max_group)
-		out[offset_id] = in[offset_id];
 }
