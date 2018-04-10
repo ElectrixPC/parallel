@@ -295,19 +295,22 @@ __kernel void init_bitonic(__global float* temps, __global float *output) {
 
 		for (int stride = size / 2; stride > 0; stride >>= 1) {
 			barrier(CLK_LOCAL_MEM_FENCE);
-			bool modified = false;
 			int pos = 2 * lid - (lid & (stride - 1));
-			if (A[pos] == 0.0) {
+			/*if (A[pos] == 0.0) {
 				A[pos] = 99.0;
-				modified = true;
 			}
 			if (A[pos] == -99.0) {
 				A[pos] = 0.0;
-				modified = true;
 			}
-			if (modified == false) {
-				ComparatorLocal(&A[pos], &A[pos + stride], direction);
+			if (A[pos + stride] == 0.0) {
+				A[pos + stride] = 99.0;
 			}
+			if (A[pos + stride] == -99.0) {
+				A[pos + stride] = 0.0;
+			}
+*/
+			ComparatorLocal(&A[pos], &A[pos + stride], direction);
+			
 		}
 
 	}
@@ -319,11 +322,20 @@ __kernel void init_bitonic(__global float* temps, __global float *output) {
 		barrier(CLK_LOCAL_MEM_FENCE);
 
 		int pos = 2 * lid - (lid & (stride - 1));
-		if (A[pos] != 0.0) {
-			ComparatorLocal(&A[pos], &A[pos + stride], direction);
-		}
-		else
+		/*if (A[pos] == 0.0) {
 			A[pos] = 99.0;
+		}
+		if (A[pos] == -99.0) {
+			A[pos] = 0.0;
+		}
+		if (A[pos + stride] == 0.0) {
+			A[pos + stride] = 99.0;
+		}
+		if (A[pos + stride] == -99.0) {
+			A[pos + stride] = 0.0;
+		}
+*/
+		ComparatorLocal(&A[pos], &A[pos + stride], direction);
 
 
 	}
@@ -343,6 +355,18 @@ __kernel void bitonic_merge_global(__global float* temps, __global float* output
 	int pos = 2 * global_comparator - (global_comparator & (stride - 1));
 	float A = temps[pos];
 	float B = temps[pos + stride];
+	if (A == 0.0) {
+		A = 99.0;
+	}
+	if (A == -99.0) {
+		A = 0.0;
+	}
+	if (B == 0.0) {
+		B = 99.0;
+	}
+	if (B == -99.0) {
+		B = 0.0;
+	}
 
 	ComparatorPrivate(&A, &B, direction);
 
@@ -350,27 +374,67 @@ __kernel void bitonic_merge_global(__global float* temps, __global float* output
 	output[pos + stride] = B;
 }
 
-__kernel void bitonic_merge_local(__global float* temps, __global float* output, int arrayLength, int size, int stride, int sortDir) {
-	int global_comparator = get_global_id(0);
-	int lid = get_local_id(0);
-	int comparator = global_comparator & ((arrayLength / 2) - 1);
-	int direction = sortDir ^ ((comparator & (size / 2)) != 0);
+//__kernel void bitonic_merge_local(__global float* temps, __global float* output, int arrayLength, int size, int stride, int sortDir) {
+//	int global_comparator = get_global_id(0);
+//	int lid = get_local_id(0);
+//	int comparator = global_comparator & ((arrayLength / 2) - 1);
+//	int direction = sortDir ^ ((comparator & (size / 2)) != 0);
+//
+//
+//	__local float A[LOCAL_SIZE_LIMIT];
+//
+//	async_work_group_copy(A, temps + get_group_id(0)*LOCAL_SIZE_LIMIT, LOCAL_SIZE_LIMIT, 0);
+//
+//	for (; stride > 0; stride >>= 1) {
+//		barrier(CLK_LOCAL_MEM_FENCE);
+//
+//		int pos = 2 * lid - (lid & (stride - 1));
+//		ComparatorLocal(&A[pos], &A[pos + stride], direction);
+//	}
+//
+//	barrier(CLK_LOCAL_MEM_FENCE);
+//
+//	async_work_group_copy(output + get_group_id(0)* LOCAL_SIZE_LIMIT, A, LOCAL_SIZE_LIMIT, 0);
+//
+//
+//}
+
+__kernel void psearch(__global const float* A, float key, __global int* result) {
+
+	int id = get_global_id(0); 
+	int p = get_local_size(0);
+	int N = get_global_size(0); 
+	int length = N;
+	__local int offset;
 
 
-	__local float A[LOCAL_SIZE_LIMIT];
+	if (id < p) {
+		offset = 0;
 
-	async_work_group_copy(A, temps + get_group_id(0)*LOCAL_SIZE_LIMIT, LOCAL_SIZE_LIMIT, 0);
+		while (length >= p) {
 
-	for (; stride > 0; stride >>= 1) {
-		barrier(CLK_LOCAL_MEM_FENCE);
+			length /= p;
+			int first = offset + id*length;
+			int last = offset + (id + 1)*length - 1;
 
-		int pos = 2 * lid - (lid & (stride - 1));
-		ComparatorLocal(&A[pos], &A[pos + stride], direction);
+			if (A[first] <= key && A[last] >= key) {
+				offset = first;
+			}
+			//all threads need to finish before the next iteration
+			barrier(CLK_GLOBAL_MEM_FENCE);
+		}
+		if (!id) {
+			if (offset != 0) {
+				printf("resultzero: %i", result[0]);
+				if (result[0] == 0) {
+					result[0] = offset;
+					printf("force %i", offset);
+				}
+				else {
+					atomic_min(&result[0], offset);
+					printf("offset %i", offset);
+				}
+			}
+		}
 	}
-
-	barrier(CLK_LOCAL_MEM_FENCE);
-
-	async_work_group_copy(output + get_group_id(0)* LOCAL_SIZE_LIMIT, A, LOCAL_SIZE_LIMIT, 0);
-
-
 }
