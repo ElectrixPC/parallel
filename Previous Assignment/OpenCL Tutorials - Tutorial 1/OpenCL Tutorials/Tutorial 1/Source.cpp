@@ -274,7 +274,7 @@ vector<float> getSorted(vector<float> temps, int lines, cl::Context context, cl:
 	//Configure kernels and queue them for execution
 	cl::Kernel init_bitonic = cl::Kernel(program, "init_bitonic");
 	cl::Kernel bitonic_merge_global = cl::Kernel(program, "bitonic_merge_global");
-	cl::Kernel bitonic_merge_local = cl::Kernel(program, "bitonic_merge_local");
+	//cl::Kernel bitonic_merge_local = cl::Kernel(program, "bitonic_merge_local");
 
 	init_bitonic.setArg(0, data_buffer);
 	init_bitonic.setArg(1, output_buffer);
@@ -303,36 +303,16 @@ vector<float> getSorted(vector<float> temps, int lines, cl::Context context, cl:
 		for (unsigned stride = size / 2; stride > 0; stride >>= 1) {
 			run++;
 
-			if (stride >= LOCAL_SIZE_LIMIT) {
-
-				bitonic_merge_global.setArg(0, output_buffer);
-				bitonic_merge_global.setArg(1, output_buffer);
-				bitonic_merge_global.setArg(2, arrayLength);
-				bitonic_merge_global.setArg(3, size);
-				bitonic_merge_global.setArg(4, stride);
-				bitonic_merge_global.setArg(5, dir);
+			bitonic_merge_global.setArg(0, output_buffer);
+			bitonic_merge_global.setArg(1, output_buffer);
+			bitonic_merge_global.setArg(2, arrayLength);
+			bitonic_merge_global.setArg(3, size);
+			bitonic_merge_global.setArg(4, stride);
+			bitonic_merge_global.setArg(5, dir);
 				
+			printf("starting kernel MergeGlobal %2d out of %d (size %4u stride %4u)\n", run, total, size, stride);
 
-				printf("starting kernel MergeGlobal %2d out of %d (size %4u stride %4u)\n", run, total, size, stride);
-
-				bitonic_merge_local.setArg(0, output_buffer);
-				queue.enqueueNDRangeKernel(bitonic_merge_global, cl::NullRange, cl::NDRange(global), cl::NDRange(local), NULL, NULL);
-
-			}
-			else {
-				bitonic_merge_local.setArg(0, output_buffer);
-				bitonic_merge_local.setArg(1, output_buffer);
-				bitonic_merge_local.setArg(2, arrayLength);
-				bitonic_merge_local.setArg(3, size);
-				bitonic_merge_local.setArg(4, stride);
-				bitonic_merge_local.setArg(5, dir);
-
-
-				printf("starting kernel MergeLocal  %2d out of %d (size %4u stride %4u)\n", run, total, size, stride);
-
-				queue.enqueueNDRangeKernel(bitonic_merge_local, cl::NullRange, cl::NDRange(global), cl::NDRange(local), NULL, NULL);
-
-			}
+			queue.enqueueNDRangeKernel(bitonic_merge_global, cl::NullRange, cl::NDRange(global), cl::NDRange(local), NULL, NULL);
 		}
 	}
 	queue.enqueueReadBuffer(output_buffer, CL_TRUE, 0, lines, &output[0]);
@@ -373,6 +353,32 @@ float getMeanValue(vector<float> temps, int lines, cl::Context context, cl::Comm
 	std::cout << "Mean Value: " << meanValue << endl;
 
 	return meanValue;
+}
+
+vector<int> getHist(vector<float> temps, int lines, cl::Context context, cl::CommandQueue queue, cl::Program program) {
+	// Input is a sorted temps vector
+	vector<int> output(1);
+	std::size_t sizeFLTBytes = lines * sizeof(float);
+	cl::Buffer buffer_temps(context, CL_MEM_READ_WRITE, sizeFLTBytes);
+	cl::Buffer buffer_output(context, CL_MEM_READ_WRITE, 1 * sizeof(int));
+
+
+	queue.enqueueWriteBuffer(buffer_temps, CL_TRUE, 0, lines, &temps[0], NULL, NULL);
+	float key = 10.0;
+	cl::Kernel kernel_getmymean = cl::Kernel(program, "psearch");
+	// Set arguments for kernel (in and out)
+	kernel_getmymean.setArg(0, buffer_temps);
+	kernel_getmymean.setArg(1, key);
+	kernel_getmymean.setArg(2, buffer_output);
+
+
+	cl::Event prof_meandata;
+
+	queue.enqueueNDRangeKernel(kernel_getmymean, cl::NullRange, cl::NDRange(lines), cl::NullRange, NULL, &prof_meandata);
+	// Retrieve output from OpenCL
+	queue.enqueueReadBuffer(buffer_output, CL_TRUE, 0, 1, &output[0]);
+
+	return output;
 }
 
 
@@ -439,7 +445,7 @@ int main(int argc, char **argv) {
 		input_file.close();
 
 		std::cout << "Time taken to open file [ms]:" << timer.End() << endl;
-
+		
 		//vector<unsigned int> minline(1);
 		//vector<float> temps = justParseData(inputElements, size, context, queue, program);
 		vector<float> temps = histParseData(inputElements, size, context, queue, program);
@@ -447,8 +453,15 @@ int main(int argc, char **argv) {
 		//float mean = getMeanValue(temps, temps.size(), context, queue, program);
 		std::cout << "Time taken to get mean [ms]:" << timer.End() << endl;
 		temps = getSorted(temps, temps.size(), context, queue, program); 
+		//vector<int> values = getHist(temps, temps.size(), context, queue, program);
 		//std::cout << "Time taken to parse data & get metrics file [ms]:" << timer.End() << endl;
-		
+		ofstream data_file;      // pay attention here! ofstream
+		data_file.open("outputsorted.txt", ios::out | ios::binary);
+		for (int count = 0; count < temps.size(); count++)
+		{
+			data_file << temps[count] << '\n';
+		}
+		data_file.close();
 		//parseGetHist(inputElements, size, context, queue, program);
 		//parseGetHistMetrics(inputElements, size, context, queue, program);
 		std::cout << "Total time taken to complete everything [ms]:" << timer.End() << endl;
