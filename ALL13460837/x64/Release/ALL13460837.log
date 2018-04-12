@@ -1,0 +1,88 @@
+﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(392,5): warning MSB8028: The intermediate directory (x64\Release\) contains files shared from another project (Previous Assignment.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+  Source.cpp
+Source.cpp(36): warning C4244: 'initializing': conversion from 'float' to 'int', possible loss of data
+Source.cpp(37): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+Source.cpp(69): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+Source.cpp(91): warning C4244: 'argument': conversion from 'double' to 'unsigned __int64', possible loss of data
+Source.cpp(92): warning C4244: 'argument': conversion from 'double' to 'unsigned __int64', possible loss of data
+Source.cpp(101): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(102): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(119): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(120): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(121): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+Source.cpp(123): warning C4244: '=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+Source.cpp(125): warning C4244: '=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+Source.cpp(128): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(129): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(130): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(131): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(132): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(139): warning C4244: 'argument': conversion from 'double' to 'unsigned __int64', possible loss of data
+Source.cpp(147): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(164): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(166): warning C4244: '=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+Source.cpp(168): warning C4244: '=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+Source.cpp(170): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+Source.cpp(172): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(173): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(174): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(175): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(176): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(200): warning C4244: 'initializing': conversion from 'unsigned int' to 'float', possible loss of data
+Source.cpp(201): warning C4244: 'initializing': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(224): warning C4244: '=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+Source.cpp(236): warning C4244: 'argument': conversion from 'double' to 'unsigned __int64', possible loss of data
+Source.cpp(237): warning C4244: 'argument': conversion from 'double' to 'unsigned __int64', possible loss of data
+Source.cpp(258): warning C4244: 'initializing': conversion from 'unsigned int' to 'float', possible loss of data
+Source.cpp(259): warning C4244: 'initializing': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(265): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(266): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(286): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(287): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(289): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+Source.cpp(291): warning C4244: '=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+Source.cpp(293): warning C4244: '=': conversion from 'cl::detail::param_traits<cl::detail::cl_profiling_info,4739>::param_type' to 'long', possible loss of data
+Source.cpp(296): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(297): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(298): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(299): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(300): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(323): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+Source.cpp(370): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
+Source.cpp(371): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
+Source.cpp(372): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+Source.cpp(374): warning C4244: 'argument': conversion from 'float' to 'unsigned __int64', possible loss of data
+Source.cpp(375): warning C4244: 'argument': conversion from 'double' to 'unsigned __int64', possible loss of data
+Source.cpp(385): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
+Source.cpp(386): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
+Source.cpp(387): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+Source.cpp(421): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
+Source.cpp(422): warning C4244: 'initializing': conversion from '__int64' to 'int', possible loss of data
+Source.cpp(423): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+Source.cpp(424): warning C4244: 'argument': conversion from 'double' to 'unsigned __int64', possible loss of data
+Source.cpp(425): warning C4244: 'initializing': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(427): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(441): warning C4244: 'argument': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(444): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(445): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(446): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(447): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(448): warning C4244: 'argument': conversion from 'float' to 'int', possible loss of data
+Source.cpp(458): warning C4244: 'initializing': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(481): warning C4244: 'initializing': conversion from 'double' to 'std::size_t', possible loss of data
+Source.cpp(596): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+Source.cpp(598): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+Source.cpp(600): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+Source.cpp(605): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+Source.cpp(606): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+Source.cpp(609): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+Source.cpp(611): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+  Generating code
+  890 of 895 functions (99.4%) were compiled, the rest were copied from previous compilation.
+    5 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  ALL13460837.vcxproj -> C:\Users\lanca\Documents\ALL13460837_CMP3100\x64\Release\ALL13460837Assignment.exe
+  ALL13460837.vcxproj -> C:\Users\lanca\Documents\ALL13460837_CMP3100\x64\Release\ALL13460837Assignment.pdb (Full PDB)
+  my_kernels.cl
+          1 file(s) copied.
